@@ -121,6 +121,11 @@ type NovaComputeSpec struct {
 	// +kubebuilder:validation:Optional
 	// DefaultConfigOverwrite - interface to overwrite default config files like e.g. provider.yaml
 	DefaultConfigOverwrite map[string]string `json:"defaultConfigOverwrite,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Auth - Parameters related to authentication
+	Auth AuthSpec `json:"auth,omitempty"`
 }
 
 // NovaComputeStatus defines the observed state of NovaCompute

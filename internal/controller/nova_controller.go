@@ -1262,6 +1262,8 @@ func (r *NovaReconciler) ensureCell(
 		// TODO(gibi): Pass down a narrowed secret that only hold
 		// specific information but also holds user names
 		cell.Spec = cellSpec
+		// Copy Auth from parent, always overriding child-level settings
+		cell.Spec.Auth = instance.Spec.Auth
 
 		err := controllerutil.SetControllerReference(instance, cell, r.Scheme)
 		if err != nil {
@@ -2082,6 +2084,27 @@ func (r *NovaReconciler) ensureTopLevelSecret(
 		QuorumQueuesTemplateKey:          quorumQueuesValue,
 	}
 
+	// Retrieve Application Credential data if configured
+	// This AC data will be available to all Nova components via the shared secret
+	if instance.Spec.Auth.ApplicationCredentialSecret != "" {
+		Log := r.GetLogger(ctx)
+		acSecret := &corev1.Secret{}
+		key := types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Auth.ApplicationCredentialSecret}
+		if err := r.Client.Get(ctx, key, acSecret); err != nil {
+			if !k8s_errors.IsNotFound(err) {
+				Log.Error(err, "Failed to get ApplicationCredential secret", "secret", key)
+			}
+		} else {
+			acID, okID := acSecret.Data[keystonev1.ACIDSecretKey]
+			acSecretData, okSecret := acSecret.Data[keystonev1.ACSecretSecretKey]
+			if okID && len(acID) > 0 && okSecret && len(acSecretData) > 0 {
+				data["ACID"] = string(acID)
+				data["ACSecret"] = string(acSecretData)
+				Log.Info("Using ApplicationCredentials auth (centralized from parent Nova CR)", "secret", key)
+			}
+		}
+	}
+
 	// NOTE(gibi): When we switch to immutable secrets then we need to include
 	// the hash of the secret data into the name of the secret to avoid
 	// deleting and re-creating the Secret with the same name.
@@ -2202,6 +2225,7 @@ func (r *NovaReconciler) memcachedNamespaceMapFunc(ctx context.Context, src clie
 var (
 	novaWatchFields = []string{
 		passwordSecretField,
+		authAppCredSecretField,
 	}
 )
 
@@ -2215,6 +2239,18 @@ func (r *NovaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return nil
 		}
 		return []string{cr.Spec.Secret}
+	}); err != nil {
+		return err
+	}
+
+	// index authAppCredSecretField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &novav1.Nova{}, authAppCredSecretField, func(rawObj client.Object) []string {
+		// Extract the application credential secret name from the spec, if one is provided
+		cr := rawObj.(*novav1.Nova)
+		if cr.Spec.Auth.ApplicationCredentialSecret == "" {
+			return nil
+		}
+		return []string{cr.Spec.Auth.ApplicationCredentialSecret}
 	}); err != nil {
 		return err
 	}

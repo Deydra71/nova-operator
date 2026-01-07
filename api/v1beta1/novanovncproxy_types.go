@@ -166,6 +166,11 @@ type NovaNoVNCProxySpec struct {
 	// +kubebuilder:validation:Required
 	// MemcachedInstance is the name of the Memcached CR that all nova service will use.
 	MemcachedInstance string `json:"memcachedInstance"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Auth - Parameters related to authentication
+	Auth AuthSpec `json:"auth,omitempty"`
 }
 
 // NovaNoVNCProxyStatus defines the observed state of NovaNoVNCProxy

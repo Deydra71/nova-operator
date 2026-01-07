@@ -136,6 +136,11 @@ type NovaConductorSpec struct {
 	// +kubebuilder:validation:Optional
 	// DBPurge defines the parameters for the DB archiving and purging cron job
 	DBPurge NovaCellDBPurge `json:"dbPurge"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Auth - Parameters related to authentication
+	Auth AuthSpec `json:"auth,omitempty"`
 }
 
 // NovaConductorStatus defines the observed state of NovaConductor
